@@ -51,10 +51,10 @@ void draw(){
   if (keyPressed){
     switch (key){
       case 'a':
-        RotX -= AngleToRad(3);
+        RotX += AngleToRad(3);
         break;
       case 'd':
-        RotX += AngleToRad(3);
+        RotX -= AngleToRad(3);
         break;
     }
   }
