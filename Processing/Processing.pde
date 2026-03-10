@@ -214,8 +214,7 @@ void DrawEdges(float[][] Verts) {
     }
     float[] ScreenPoint1 = WorldToScreen(WorldPoint1);
     float[] ScreenPoint2 = WorldToScreen(WorldPoint2);
-    int triangleIndex = i / 3; //same triangle = same colour for edge
-    stroke(EdgeColours[triangleIndex % EdgeColours.length]);
+    stroke(EdgeColours[i % EdgeColours.length]);
     line(ScreenPoint1[0], ScreenPoint1[1], ScreenPoint2[0], ScreenPoint2[1]);
   }
 }
