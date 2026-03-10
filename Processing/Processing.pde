@@ -35,7 +35,8 @@ int[][] Edges;
 
 void setup(){
   size(800, 800);
-  LoadOBJ("Plane.obj");
+  String FileName = "Plane.obj";
+  LoadOBJ("../Objects/" + FileName);
 }
 
 float AngleToRad(float Angle){
@@ -75,9 +76,9 @@ void draw(){
 
   DrawEdges(Transformed);
 }
-void LoadOBJ(String FileName){
+void LoadOBJ(String FilePath){
   // parse obj file text
-  String[] FileLines = loadStrings(FileName);
+  String[] FileLines = loadStrings(FilePath);
   float[][] TempVertices = new float[FileLines.length][3];
   int VertexCount = 0;
   int[][] TempEdgeList = new int[FileLines.length * 4][2];
