@@ -34,14 +34,14 @@ float ColourDir = 1;
 float ColourIntensity = BaseIntensity+1;
 Boolean AlwaysRender = true;
 Boolean Strobe = false;
-
+Boolean DisplayVerticies = true;
 
 float[][] Verticies;
 int[][] Edges;
 int Frame = 0;
 void setup(){
   size(800, 800);
-  String FileName = "Cube.obj";
+  String FileName = "Sphere.obj";
   LoadOBJ("../Objects/" + FileName);
 }
 
@@ -52,8 +52,26 @@ float WrapAngle(float Angle){
   float TwoPI = 2 * PI;
   return (Angle % TwoPI + TwoPI) % TwoPI;
 }
+float RoundNumber(float Input, float Precision){
+  
+  double PrecisionDouble = (double) Precision; 
+  double Multiplier = Math.pow(10, PrecisionDouble);
+  double Increased = Input*Multiplier;
+  double Rounded = Math.floor(Increased + 0.5);
+  double Converted = Rounded/Multiplier;
+  float ConvertedFloat = (float) Converted;
+  return ConvertedFloat;
+}
+
+
+float RandomRotX = random(-1, 1);
+float RandomRotY = random(-1, 1);
 
 void draw(){
+  
+  RotX += AngleToRad(RandomRotX);
+  RotY += AngleToRad(RandomRotY);
+
   if (keyPressed){
     switch (key){
       case 'a':
@@ -213,12 +231,12 @@ void LabelVerticies(float[][] Verticies){
     for (int i = 0; i < Verticies.length; i++) {
        float[] Vert =  Verticies[i];
        float[] ScreenPoint = WorldToScreen(Vert);
-       String x = String.valueOf(Vert[0]);
-       String y = String.valueOf(Vert[1]);
-       String z = String.valueOf(Vert[2]);
+       String x = String.valueOf(RoundNumber(Vert[0], 3));
+       String y = String.valueOf(RoundNumber(Vert[1], 3));
+       String z = String.valueOf(RoundNumber(Vert[2], 3));
 
-       
-       text((x + ", " + y + ", " + z), ScreenPoint[0], ScreenPoint[1]);
+       //text((x + ", " + y + ", " + z), ScreenPoint[0], ScreenPoint[1]);
+
        textAlign(CENTER);
 
     }
