@@ -3,7 +3,7 @@ float RotY = AngleToRad(90);;
 float RotZ = 0;
 
 float VertXOffset = 0;
-float VertYOffset = 300;
+float VertYOffset = 0;
 float VertZOffset = 0;
 
 float CamDist = 0;
@@ -29,13 +29,19 @@ color[] EdgeColours = {
   color(100, 100, 255),
   color(255, 255, 255)
 };
+float BaseIntensity = 50;
+float ColourDir = 1;
+float ColourIntensity = BaseIntensity+1;
+Boolean AlwaysRender = true;
+Boolean Strobe = false;
+
 
 float[][] Verticies;
 int[][] Edges;
-
+int Frame = 0;
 void setup(){
   size(800, 800);
-  String FileName = "Plane.obj";
+  String FileName = "Cube.obj";
   LoadOBJ("../Objects/" + FileName);
 }
 
@@ -58,13 +64,15 @@ void draw(){
         break;
     }
   }
-
-
-  if (RotX == PrevRotX && RotY == PrevRotY && RotZ == PrevRotZ && CamDist == PrevCamDist) { //if not changed dont redraw
+  Frame += 1;
+  if ((RotX == PrevRotX && RotY == PrevRotY && RotZ == PrevRotZ && CamDist == PrevCamDist) && !AlwaysRender) { //if not changed dont redraw
     return;
   }
   //RotX = constrain(RotX, -PI/2, PI/2); // clamp rot
-
+  if (ColourIntensity >= 255 || ColourIntensity <= BaseIntensity){
+    ColourDir *= -1;
+  }
+  ColourIntensity += (ColourDir*3);
   PrevRotX = RotX;
   PrevRotY = RotY;
   PrevCamDist = CamDist;
@@ -75,6 +83,7 @@ void draw(){
   }
 
   DrawEdges(Transformed);
+  LabelVerticies(Transformed);
 }
 void LoadOBJ(String FilePath){
   // parse obj file text
@@ -200,7 +209,21 @@ float[] WorldToScreen(float[] Position) {
   float ScreenY = (WorldY / WorldZ) * Scale + height / 2;
   return new float[]{ScreenX, ScreenY};
 }
+void LabelVerticies(float[][] Verticies){
+    for (int i = 0; i < Verticies.length; i++) {
+       float[] Vert =  Verticies[i];
+       float[] ScreenPoint = WorldToScreen(Vert);
+       String x = String.valueOf(Vert[0]);
+       String y = String.valueOf(Vert[1]);
+       String z = String.valueOf(Vert[2]);
 
+       
+       text((x + ", " + y + ", " + z), ScreenPoint[0], ScreenPoint[1]);
+       textAlign(CENTER);
+
+    }
+
+}
 void DrawEdges(float[][] Verts) {
   for (int i = 0; i < Edges.length; i++) {
     int[] Edge = Edges[i];
@@ -214,10 +237,17 @@ void DrawEdges(float[][] Verts) {
     }
     float[] ScreenPoint1 = WorldToScreen(WorldPoint1);
     float[] ScreenPoint2 = WorldToScreen(WorldPoint2);
-    stroke(EdgeColours[i % EdgeColours.length]);
+    if (Strobe){
+        stroke(color(ColourIntensity,ColourIntensity,ColourIntensity));
+    } else {
+        stroke(EdgeColours[i % EdgeColours.length]);
+    }
+    
     line(ScreenPoint1[0], ScreenPoint1[1], ScreenPoint2[0], ScreenPoint2[1]);
   }
 }
+
+
 void mouseDragged() {
   float Sensitivity = 0.01;
   RotY += (mouseX - pmouseX)*Sensitivity;
