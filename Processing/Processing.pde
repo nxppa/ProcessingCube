@@ -1,20 +1,38 @@
+String BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+import processing.sound.*;
+SoundFile Music;
+
+float PosXOffset = 0;
+float PosYOffset = 6;
+float PosZOffset = 0;
+
 float RotX = 0;
-float RotY = AngleToRad(90);;
+float RotY = 0;
 float RotZ = 0;
 
-float VertXOffset = 0;
-float VertYOffset = 0;
-float VertZOffset = 0;
-
 float CamDist = 0;
-
-float PrevRotX = RotX;
-float PrevRotY = RotY;
-float PrevRotZ = RotZ;
-
-float PrevCamDist = CamDist;
-
 float MaxDistance = 0;
+
+float[][] Verticies;
+int[][] Faces;
+float[][] ZBuffer;
+
+int Frame = 0;
+
+String Media;
+int[][][] Frames;
+int[][] FrameBuffer;
+float[][] TexCoords;
+int[][] FaceColourRanges = {
+  {0, 700, 99, 78, 53}, // table
+
+  {701, 1007, 20, 20, 20}, // left monitor
+
+  {1008, 1020, 30, 30, 30}, //pc
+  {1021, 1035, 70, 70, 70}, // keyboard
+  {1035, 2000, 20, 20, 20}, // right monitor
+};
+
 color[] EdgeColours = {
   color(255, 0, 0),
   color(255, 128, 0),
@@ -27,252 +45,467 @@ color[] EdgeColours = {
   color(255, 100, 100),
   color(100, 255, 100),
   color(100, 100, 255),
-  color(255, 255, 255)
-};
-float BaseIntensity = 50;
-float ColourDir = 1;
-float ColourIntensity = BaseIntensity+1;
-Boolean AlwaysRender = true;
-Boolean Strobe = false;
-Boolean DisplayVerticies = true;
+  color(255, 255, 255) };
+int VideoWidth;
+int VideoHeight;
+int FPS;
+boolean PrintedTriangleThisFrame = false;
 
-float[][] Verticies;
-int[][] Edges;
-int Frame = 0;
-void setup(){
-  size(800, 800);
-  String FileName = "Sphere.obj";
-  LoadOBJ("../Objects/" + FileName);
+void setup() {
+  size(512, 512);
+  ZBuffer = new float[width][height];
+  LoadOBJ("../Objects/mypcv2.obj");
+  LoadMedia();
 }
 
-float AngleToRad(float Angle){
+float AngleToRad(float Angle) {
   return Angle * PI / 180;
 }
-float WrapAngle(float Angle){
-  float TwoPI = 2 * PI;
-  return (Angle % TwoPI + TwoPI) % TwoPI;
+
+void LoadMedia() {
+  String Path = "../ProcessingBA/data/media.txt";
+  String[] lines = loadStrings(Path);
+  Music = new SoundFile(this, "../ProcessingBA/Media/BA.wav");
+  Music.play();
+  String[] Header = split(lines[0], ',');
+  VideoWidth = int(Header[0]);
+  VideoHeight = int(Header[1]);
+  FPS = int(Header[2]);
+  String[] mediaLines = subset(lines, 1);
+  Media = join(mediaLines, "");
+  Frames = ParseMedia(Media);
+  FrameBuffer = new int[VideoWidth][VideoHeight];
 }
-float RoundNumber(float Input, float Precision){
-  
-  double PrecisionDouble = (double) Precision; 
-  double Multiplier = Math.pow(10, PrecisionDouble);
-  double Increased = Input*Multiplier;
-  double Rounded = Math.floor(Increased + 0.5);
-  double Converted = Rounded/Multiplier;
-  float ConvertedFloat = (float) Converted;
-  return ConvertedFloat;
+
+int B64Val(char c) {
+  if (c == '=') return 0;
+  return BASE64.indexOf(c);
 }
 
+byte[] DecodeBase64(String s) {
+  int b0 = B64Val(s.charAt(0));
+  int b1 = B64Val(s.charAt(1));
+  int b2 = B64Val(s.charAt(2));
+  int b3 = B64Val(s.charAt(3));
+  int b4 = B64Val(s.charAt(4));
+  int b5 = B64Val(s.charAt(5));
+  int b6 = B64Val(s.charAt(6));
+  int b7 = B64Val(s.charAt(7));
+  int b8 = B64Val(s.charAt(8));
+  int b9 = B64Val(s.charAt(9));
+  int b10 = B64Val(s.charAt(10));
+  int b11 = B64Val(s.charAt(11));
+  int c0 = (b0 << 18) | (b1 << 12) | (b2 << 6) | b3;
+  int c1 = (b4 << 18) | (b5 << 12) | (b6 << 6) | b7;
+  int c2 = (b8 << 18) | (b9 << 12) | (b10 << 6) | b11;
+  byte[] out = new byte[8];
+  out[0] = (byte)((c0 >> 16) & 255);
+  out[1] = (byte)((c0 >> 8) & 255);
+  out[2] = (byte)(c0 & 255);
+  out[3] = (byte)((c1 >> 16) & 255);
+  out[4] = (byte)((c1 >> 8) & 255);
+  out[5] = (byte)(c1 & 255);
+  out[6] = (byte)((c2 >> 16) & 255);
+  out[7] = (byte)((c2 >> 8) & 255);
+  return out;
+}
 
-float RandomRotX = random(-1, 1);
-float RandomRotY = random(-1, 1);
+int[][][] ParseMedia(String media) {
+  String[] FrameStrings = split(media, '|');
+  int[][][] Frames = new int[FrameStrings.length][][];
+  for (int f = 0; f < FrameStrings.length; f++) {
+    if (FrameStrings[f].length() == 0) {
+      Frames[f] = new int[0][4];
+      continue;
+    }
+    String[] RectStrings = split(FrameStrings[f], ',');
+    int[][] Rectangles = new int[RectStrings.length][4];
+    for (int r = 0; r < RectStrings.length; r++) {
+      byte[] Decoded = DecodeBase64(RectStrings[r]);
+      Rectangles[r][0] = ((Decoded[0] & 255) << 8) | (Decoded[1] & 255);
+      Rectangles[r][1] = ((Decoded[2] & 255) << 8) | (Decoded[3] & 255);
+      Rectangles[r][2] = ((Decoded[4] & 255) << 8) | (Decoded[5] & 255);
+      Rectangles[r][3] = ((Decoded[6] & 255) << 8) | (Decoded[7] & 255);
+    }
+    Frames[f] = Rectangles;
+  }
+  return Frames;
+}
 
-void draw(){
-  
-  RotX += AngleToRad(RandomRotX);
-  RotY += AngleToRad(RandomRotY);
+int CurrentFrame = 0;
 
-  if (keyPressed){
-    switch (key){
-      case 'a':
-        RotX += AngleToRad(3);
-        break;
-      case 'd':
-        RotX -= AngleToRad(3);
-        break;
+void BuildFrameBuffer() {
+  for (int x=0; x<VideoWidth; x++) {
+    for (int y=0; y<VideoHeight; y++) {
+      FrameBuffer[x][y]=0;
     }
   }
-  Frame += 1;
-  if ((RotX == PrevRotX && RotY == PrevRotY && RotZ == PrevRotZ && CamDist == PrevCamDist) && !AlwaysRender) { //if not changed dont redraw
-    return;
+  int[][] Rectangles = Frames[CurrentFrame];
+  for (int i=0; i<Rectangles.length; i++) {
+    int rx = Rectangles[i][0];
+    int ry = Rectangles[i][1];
+    int rw = Rectangles[i][2];
+    int rh = Rectangles[i][3];
+    for (int x=rx; x<rx+rw; x++)
+      for (int y=ry; y<ry+rh; y++) {
+        if (x>=0 && x<VideoWidth && y>=0 && y<VideoHeight) {
+          FrameBuffer[x][y]=255;
+        }
+      }
   }
-  //RotX = constrain(RotX, -PI/2, PI/2); // clamp rot
-  if (ColourIntensity >= 255 || ColourIntensity <= BaseIntensity){
-    ColourDir *= -1;
+  CurrentFrame++;
+  if (CurrentFrame>=Frames.length) {
+    CurrentFrame=0;
   }
-  ColourIntensity += (ColourDir*3);
-  PrevRotX = RotX;
-  PrevRotY = RotY;
-  PrevCamDist = CamDist;
-  background(0);
-  float[][] Transformed = new float[Verticies.length][3];
-  for (int i = 0; i < Verticies.length; i++) {
-    Transformed[i] = TransformVertex(Verticies[i]);
-  }
-
-  DrawEdges(Transformed);
-  LabelVerticies(Transformed);
 }
-void LoadOBJ(String FilePath){
-  // parse obj file text
-  String[] FileLines = loadStrings(FilePath);
-  float[][] TempVertices = new float[FileLines.length][3];
-  int VertexCount = 0;
-  int[][] TempEdgeList = new int[FileLines.length * 4][2];
-  int EdgeCount = 0;
-  for (int i = 0; i < FileLines.length; i++) {
-    String CurrentLine = trim(FileLines[i]);
+
+void LoadOBJ(String FilePath) {
+  String[] Lines = loadStrings(FilePath);
+  float[][] TempVerts = new float[Lines.length][3];
+  float[][] TempUVs   = new float[Lines.length][2];
+  int VertCount = 0;
+  int UVCount = 0;
+  int[][] TempFaces = new int[Lines.length * 4][6];
+  int FaceCount = 0;
+  for (int l = 0; l < Lines.length; l++) {
+    String CurrentLine = Lines[l];
+    CurrentLine = trim(CurrentLine);
     if (CurrentLine.startsWith("v ")) {
-      String[] Tokens = split(CurrentLine, ' ');
-      float x = float(Tokens[1]);
-      float y = -float(Tokens[2]);
-      float z = float(Tokens[3]);
-      TempVertices[VertexCount] = new float[]{x, y, z};
-      VertexCount++;
+      String[] t = split(CurrentLine, ' ');
+      float x = float(t[1]);
+      float y = -float(t[2]);
+      float z = float(t[3]);
+      TempVerts[VertCount] = new float[]{x + PosXOffset, y + PosYOffset, - (z + PosZOffset)};
+      VertCount += 1;
     }
+
+    if (CurrentLine.startsWith("vt ")) {
+      String[] t = split(CurrentLine, ' ');
+      float u = float(t[1]);
+      float v = 1 - float(t[2]);
+      TempUVs[UVCount] = new float[]{u, v};
+      UVCount += 1;
+    }
+
     if (CurrentLine.startsWith("f ")) {
-      String[] Tokens = split(CurrentLine, ' ');
-      int FaceVertexCount = Tokens.length - 1;
-      int[] FaceVertexIndices = new int[FaceVertexCount];
-      for (int j = 0; j < FaceVertexCount; j++) {
-        String VertexToken = Tokens[j + 1];
-        String[] Indices = split(VertexToken, '/');
-        int VertexIndex = int(Indices[0]) - 1;
-        FaceVertexIndices[j] = VertexIndex;
+      String[] t = split(CurrentLine, ' ');
+      int n = t.length - 1;
+      int[] VertIndex = new int[n];
+      for (int i = 0; i < n; i++) {
+        String[] parts = split(t[i + 1], '/');
+        VertIndex[i] = int(parts[0]) - 1;
       }
-      for (int j = 0; j < FaceVertexCount; j++) {
-        int VertexA = FaceVertexIndices[j];
-        int VertexB = FaceVertexIndices[(j + 1) % FaceVertexCount];
-        int EdgeMin = min(VertexA, VertexB);
-        int EdgeMax = max(VertexA, VertexB);
-        TempEdgeList[EdgeCount] = new int[]{EdgeMin, EdgeMax};
-        EdgeCount++;
+      for (int i = 1; i < n - 1; i++) {
+        TempFaces[FaceCount] = new int[]{
+          VertIndex[0], VertIndex[i], VertIndex[i + 1],
+        };
+        FaceCount += 1;
       }
     }
   }
 
-  Verticies = new float[VertexCount][3];
-  for (int i = 0; i < VertexCount; i++) {
-    Verticies[i] = TempVertices[i];
+  Verticies = new float[VertCount][3];
+  for (int i = 0; i < VertCount; i++) {
+    Verticies[i] = TempVerts[i];
   }
-
-  //centre model around origin
-  float CenterX = 0;
-  float CenterY = 0;
-  float CenterZ = 0;
-
-  for (int i = 0; i < VertexCount; i++){
-    CenterX += Verticies[i][0];
-    CenterY += Verticies[i][1];
-    CenterZ += Verticies[i][2];
+  TexCoords = new float[UVCount][2];
+  for (int i = 0; i < UVCount; i++) {
+    TexCoords[i] = TempUVs[i];
   }
-
-  CenterX /= VertexCount;
-  CenterY /= VertexCount;
-  CenterZ /= VertexCount;
-
-  for (int i = 0; i < VertexCount; i++) {
-    Verticies[i][0] += (-CenterX + VertXOffset);
-    Verticies[i][1] += (-CenterY + VertYOffset);
-    Verticies[i][2] += (-CenterZ + VertZOffset);
+  Faces = new int[FaceCount][6];
+  for (int i = 0; i < FaceCount; i++) {
+    Faces[i] = TempFaces[i];
   }
-
-  //find furthest vertex
-  for (int i = 0; i < VertexCount; i++){
-    float x = Verticies[i][0];
-    float y = Verticies[i][1];
-    float z = Verticies[i][2];
-    float Distance = sqrt(x*x + y*y + z*z);
+  for (int i = 0; i < Verticies.length; i++) {
+    float[] CurVert = Verticies[i];
+    float Distance = sqrt(CurVert[0]*CurVert[0] + CurVert[1]*CurVert[1] + CurVert[2]*CurVert[2]);
     if (Distance > MaxDistance) {
       MaxDistance = Distance;
     }
   }
-  CamDist = MaxDistance * 1.5;
-  Edges = new int[EdgeCount][2];
-  for (int i = 0; i < EdgeCount; i++) {
-    Edges[i] = TempEdgeList[i];
+  CamDist = MaxDistance * 1;
+}
+
+float[] TransformVertex(float[] Vert) {
+
+  float X = Vert[0];
+  float Y = Vert[1];
+  float Z = Vert[2];
+
+  float RotXY = Y * cos(RotX) - Z * sin(RotX);
+  float RotXZ = Y * sin(RotX) + Z * cos(RotX);
+  float RotXX = X;
+
+  float RotYX = RotXX * cos(RotY) - RotXZ * sin(RotY);
+  float RotYZ = RotXX * sin(RotY) + RotXZ * cos(RotY);
+  float RotYY = RotXY;
+
+  float FinalX = RotYX;
+  float FinalY = RotYY;
+  float FinalZ = RotYZ + CamDist;
+
+  return new float[]{FinalX, FinalY, FinalZ};
+}
+
+color GetFaceColor(int FaceIndex) {
+  for (int i = 0; i < FaceColourRanges.length; i++) {
+    int start = FaceColourRanges[i][0];
+    int end   = FaceColourRanges[i][1];
+    if (FaceIndex >= start && FaceIndex <= end) {
+      return color(FaceColourRanges[i][2], FaceColourRanges[i][3], FaceColourRanges[i][4]);
+    }
+  }
+  return color(255, 0, 255); // pink if not found
+}
+
+float[] WorldToScreen(float[] p) {
+  float scale = 200;
+  float sx = (p[0]/p[2])*scale + width/2;
+  float sy = (p[1]/p[2])*scale + height/2;
+  return new float[]{sx, sy};
+}
+
+void ClearZBuffer() {
+  for (int x=0; x<width; x++) {
+    for (int y=0; y<height; y++) {
+      ZBuffer[x][y]=Float.MAX_VALUE;
+    }
   }
 }
 
-float[] TransformVertex(float[] Vertex) {
-  float[] FirstRot = RotateX(Vertex, RotX);
-  float[] SecondRot = RotateY(FirstRot, RotY);
-  float[] ThirdRot = RotateZ(SecondRot, RotZ);
-  return new float[]{
-    ThirdRot[0],
-    ThirdRot[1],
-    ThirdRot[2] + CamDist
-  };
+void draw() {
+  //RotX += AngleToRad(1);
+  //RotY += AngleToRad(1);
+  Frame += 1;
+  BuildFrameBuffer();
+  background(122, 122, 122);
+  ClearZBuffer();
+  float[][] CurrentVerts = new float[Verticies.length][3];
+  for (int i=0; i<Verticies.length; i++) {
+    CurrentVerts[i]=TransformVertex(Verticies[i]);
+  }
+  PrintedTriangleThisFrame = false;
+  DrawFaces(CurrentVerts);
 }
-float[] RotateX(float[] Vertex, float Angle) {
-  float x = Vertex[0];
-  float y = Vertex[1];
-  float z = Vertex[2];
-  float MatrixOutputY = y * cos(Angle) - z * sin(Angle);
-  float MatrixOutputZ = y * sin(Angle) + z * cos(Angle);
-  return new float[]{x, MatrixOutputY, MatrixOutputZ};
+boolean IsInsideTriangle(float Px, float Py, float[] VertA, float[] VertB, float[] VertC, float InvDenom, float[] OutWeights) {
+  float WeightA = ((VertB[1] - VertC[1]) * (Px - VertC[0]) + (VertC[0] - VertB[0]) * (Py - VertC[1])) * InvDenom;
+  if (WeightA < 0) {
+    return false;
+  }
+  float WeightB = ((VertC[1] - VertA[1]) * (Px - VertC[0]) + (VertA[0] - VertC[0]) * (Py - VertC[1])) * InvDenom;
+  if (WeightB < 0) {
+    return false;
+  }
+  float WeightC = 1 - WeightA - WeightB;
+  if (WeightC < 0){
+    return false;
+  }
+  OutWeights[0] = WeightA;
+  OutWeights[1] = WeightB;
+  OutWeights[2] = WeightC;
+  return true;
 }
-float[] RotateY(float[] Vertex, float Angle) {
-  float x = Vertex[0];
-  float y = Vertex[1];
-  float z = Vertex[2];
-  float MatrixOutputX = x * cos(Angle) - z * sin(Angle);
-  float MatrixOutputZ = x * sin(Angle) + z * cos(Angle);
-  return new float[]{MatrixOutputX, y, MatrixOutputZ};
+float GetMinOf(float[] Values){
+  float MinValue = Values[0];
+  for (int i = 1; i < Values.length; i++){
+    if (Values[i] < MinValue) {
+      MinValue = Values[i];
+    }
+  }
+  return MinValue;
 }
-float[] RotateZ(float[] Vertex, float Angle) {
-  float x = Vertex[0];
-  float y = Vertex[1];
-  float z = Vertex[2];
-  float MatrixOutputX = x * cos(Angle) - y * sin(Angle);
-  float MatrixOutputY = x * sin(Angle) + y * cos(Angle);
-  return new float[]{MatrixOutputX, MatrixOutputY, z};
-}
-float[] WorldToScreen(float[] Position) {
-  float Scale = 200;
-  float WorldX = Position[0];
-  float WorldY = Position[1];
-  float WorldZ = Position[2];
-  float ScreenX = (WorldX / WorldZ) * Scale + width / 2;
-  float ScreenY = (WorldY / WorldZ) * Scale + height / 2;
-  return new float[]{ScreenX, ScreenY};
-}
-void LabelVerticies(float[][] Verticies){
-    for (int i = 0; i < Verticies.length; i++) {
-       float[] Vert =  Verticies[i];
-       float[] ScreenPoint = WorldToScreen(Vert);
-       String x = String.valueOf(RoundNumber(Vert[0], 3));
-       String y = String.valueOf(RoundNumber(Vert[1], 3));
-       String z = String.valueOf(RoundNumber(Vert[2], 3));
 
-       //text((x + ", " + y + ", " + z), ScreenPoint[0], ScreenPoint[1]);
+float GetMaxOf(float[] Values) {
+  float MaxValue = Values[0];
+  for (int i = 1; i < Values.length; i++){
+    if (Values[i] > MaxValue){
+      MaxValue = Values[i];
+    }
+  }
+  return MaxValue;
+}
+void DrawFaces(float[][] V) {
+  float LightDirectionX = -0.5;
+  float LightDirectionY = 1;
+  float LightDirectionZ = -1.5;
 
-       textAlign(CENTER);
+  float LightLength = sqrt(LightDirectionX * LightDirectionX + LightDirectionY * LightDirectionY + LightDirectionZ * LightDirectionZ);
 
+  LightDirectionX /= LightLength;
+  LightDirectionY = -LightDirectionY / LightLength;
+  LightDirectionZ /= LightLength;
+
+  int Screen1 = 1322;
+  int Screen2 = 1323;
+
+  int FaceCount = Faces.length;
+
+  float[] Weights = new float[3];
+
+  for (int FaceIndex = 0; FaceIndex < FaceCount; FaceIndex++) {
+    int[] face = Faces[FaceIndex];
+
+    int VertexIndexA = face[0];
+    int VertexIndexB = face[1];
+    int VertexIndexC = face[2];
+
+    float[] VertexA = V[VertexIndexA];
+    float[] VertexB = V[VertexIndexB];
+    float[] VertexC = V[VertexIndexC];
+
+    float DepthA = VertexA[2];
+    float DepthB = VertexB[2];
+    float DepthC = VertexC[2];
+
+    if (DepthA <= 0 || DepthB <= 0 || DepthC <= 0) {
+      continue;
     }
 
-}
-void DrawEdges(float[][] Verts) {
-  for (int i = 0; i < Edges.length; i++) {
-    int[] Edge = Edges[i];
-    if (Edge[0] == -1){
-      continue;  
-    } 
-    float[] WorldPoint1 = Verts[Edge[0]];
-    float[] WorldPoint2 = Verts[Edge[1]];
-    if (WorldPoint1[2] <= 0 || WorldPoint2[2] <= 0){
-        continue;
+    float[] ScreenA = WorldToScreen(VertexA);
+    float[] ScreenB = WorldToScreen(VertexB);
+    float[] ScreenC = WorldToScreen(VertexC);
+
+    int ax = (int)ScreenA[0];
+    int ay = (int)ScreenA[1];
+    int bx = (int)ScreenB[0];
+    int by = (int)ScreenB[1];
+    int cx = (int)ScreenC[0];
+    int cy = (int)ScreenC[1];
+
+    int MinimumX = max(0, min(ax, min(bx, cx)));
+    int MaximumX = min(width - 1, max(ax, max(bx, cx)));
+
+    int MinimumY = max(0, min(ay, min(by, cy)));
+    int MaximumY = min(height - 1, max(ay, max(by, cy)));
+
+    float denom = (ScreenB[1] - ScreenC[1]) * (ScreenA[0] - ScreenC[0]) + (ScreenC[0] - ScreenB[0]) * (ScreenA[1] - ScreenC[1]);
+
+    if (denom == 0) continue;
+
+    float InverseDenom = 1.0 / denom;
+
+    float[] ModelVertexA = Verticies[VertexIndexA];
+    float[] ModelVertexB = Verticies[VertexIndexB];
+    float[] ModelVertexC = Verticies[VertexIndexC];
+
+    float EdgeAX = ModelVertexB[0] - ModelVertexA[0];
+    float EdgeAY = ModelVertexB[1] - ModelVertexA[1];
+    float EdgeAZ = ModelVertexB[2] - ModelVertexA[2];
+
+    float EdgeBX = ModelVertexC[0] - ModelVertexA[0];
+    float EdgeBY = ModelVertexC[1] - ModelVertexA[1];
+    float EdgeBZ = ModelVertexC[2] - ModelVertexA[2];
+
+    float NormalX = EdgeAY * EdgeBZ - EdgeAZ * EdgeBY;
+    float NormalY = EdgeAZ * EdgeBX - EdgeAX * EdgeBZ;
+    float NormalZ = EdgeAX * EdgeBY - EdgeAY * EdgeBX;
+
+    float NormalLength = sqrt(NormalX * NormalX + NormalY * NormalY + NormalZ * NormalZ);
+
+    if (NormalLength != 0) {
+      NormalX /= NormalLength;
+      NormalY /= NormalLength;
+      NormalZ /= NormalLength;
     }
-    float[] ScreenPoint1 = WorldToScreen(WorldPoint1);
-    float[] ScreenPoint2 = WorldToScreen(WorldPoint2);
-    if (Strobe){
-        stroke(color(ColourIntensity,ColourIntensity,ColourIntensity));
-    } else {
-        stroke(EdgeColours[i % EdgeColours.length]);
+
+    float Brightness = NormalX * LightDirectionX + NormalY * LightDirectionY + NormalZ * LightDirectionZ;
+
+    if (Brightness < 0) Brightness = 0;
+    Brightness = 0.2 + Brightness * 0.8;
+
+    float InverseA = 1.0 / DepthA;
+    float InverseB = 1.0 / DepthB;
+    float InverseC = 1.0 / DepthC;
+
+    boolean IsScreenFace = (FaceIndex == Screen1 || FaceIndex == Screen2);
+
+    float MinPX=0, MaxPX=0, MinPY=0, MaxPY=0;
+
+    if (IsScreenFace) {
+
+      int q1 = Faces[Screen1][0];
+      int q2 = Faces[Screen1][1];
+      int q3 = Faces[Screen1][2];
+
+      int q4 = Faces[Screen2][0];
+      int q5 = Faces[Screen2][1];
+      int q6 = Faces[Screen2][2];
+      float[] PxValues = {Verticies[q1][0], Verticies[q2][0], Verticies[q3][0], Verticies[q4][0], Verticies[q5][0], Verticies[q6][0]};
+      float[] PyValues = {Verticies[q1][1], Verticies[q2][1], Verticies[q3][1], Verticies[q4][1], Verticies[q5][1], Verticies[q6][1]};
+
+      MinPX = GetMinOf(PxValues);
+      MaxPX = GetMaxOf(PxValues);
+
+      MinPY = GetMinOf(PyValues);
+      MaxPY = GetMaxOf(PyValues);
     }
-    
-    line(ScreenPoint1[0], ScreenPoint1[1], ScreenPoint2[0], ScreenPoint2[1]);
+
+    int BaseColor = GetFaceColor(FaceIndex);
+
+    int RedBase = (int)(((BaseColor >> 16) & 255) * Brightness);
+    int GreenBase = (int)(((BaseColor >> 8) & 255) * Brightness);
+    int BlueBase = (int)((BaseColor & 255) * Brightness);
+
+    for (int PixelY = MinimumY; PixelY <= MaximumY; PixelY++) {
+      float py = PixelY + 0.5;
+
+      for (int PixelX = MinimumX; PixelX <= MaximumX; PixelX++) {
+        float px = PixelX + 0.5;
+        if (!IsInsideTriangle(px, py, ScreenA, ScreenB, ScreenC, InverseDenom, Weights)) {
+          continue;
+        }
+        if (!PrintedTriangleThisFrame && PixelX == mouseX && PixelY == mouseY) {
+          println("over triangle " + FaceIndex);
+          PrintedTriangleThisFrame = true;
+        }
+
+        float w1 = Weights[0];
+        float w2 = Weights[1];
+        float w3 = Weights[2];
+
+        float InverseDepth = w1 * InverseA + w2 * InverseB + w3 * InverseC;
+
+        float DepthValue = 1.0 / InverseDepth;
+
+        if (DepthValue >= ZBuffer[PixelX][PixelY]) {
+          continue;
+        }
+
+        ZBuffer[PixelX][PixelY] = DepthValue;
+        if (IsScreenFace) {
+          float PointX2D = w1*ModelVertexA[0] + w2*ModelVertexB[0] + w3*ModelVertexC[0];
+          float PointY2D = w1*ModelVertexA[1] + w2*ModelVertexB[1] + w3*ModelVertexC[1];
+          float u = (PointX2D - MinPX) / (MaxPX - MinPX);
+          float v = (PointY2D - MinPY) / (MaxPY - MinPY);
+
+          int ConvertedWidth  = VideoWidth  - 1;
+          int ConvertedHeight = VideoHeight - 1;
+
+          int RawVideoX = (int) (u * ConvertedWidth);
+          int RawVideoY = (int) (v * ConvertedHeight);
+
+          int VideoX = constrain(RawVideoX, 0, ConvertedWidth);
+          int VideoY = constrain(RawVideoY, 0, ConvertedHeight);
+
+          if (FrameBuffer[VideoX][VideoY] == 255)
+            set(PixelX, PixelY, color(255, 255, 255));
+          else
+            set(PixelX, PixelY, color(0, 0, 0));
+        } else {
+          set(PixelX, PixelY, color(RedBase, GreenBase, BlueBase));
+        }
+      }
+    }
   }
 }
-
 
 void mouseDragged() {
-  float Sensitivity = 0.01;
-  RotY += (mouseX - pmouseX)*Sensitivity;
-  RotX += (mouseY - pmouseY)*Sensitivity;
-  println(RotX, RotY, CamDist);
+  float Scale=0.01;
+  RotY+=(mouseX-pmouseX)*Scale;
+  RotX+=(mouseY-pmouseY)*Scale;
 }
-void mouseWheel(MouseEvent event) {
-  CamDist += event.getCount()*MaxDistance/20;
-  CamDist = max(0, CamDist);
+
+void mouseWheel(MouseEvent Amount) {
+  CamDist+=Amount.getCount()*MaxDistance/20;
+  CamDist=max(0, CamDist);
 }
