@@ -1,7 +1,6 @@
 String BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 import processing.sound.*;
 SoundFile Music;
-
 float PosXOffset = 0;
 float PosYOffset = 6;
 float PosZOffset = 0;
@@ -51,11 +50,16 @@ int VideoHeight;
 int FPS;
 boolean PrintedTriangleThisFrame = false;
 
+long VideoStartTime;
+int LastBuiltFrame = -1;
+
 void setup() {
-  size(512, 512);
+  size(800, 800);
   ZBuffer = new float[width][height];
   LoadOBJ("../Objects/mypcv2.obj");
   LoadMedia();
+  VideoStartTime = System.currentTimeMillis();
+  pixelDensity(1);
 }
 
 float AngleToRad(float Angle) {
@@ -134,28 +138,31 @@ int[][][] ParseMedia(String media) {
 
 int CurrentFrame = 0;
 
-void BuildFrameBuffer() {
-  for (int x=0; x<VideoWidth; x++) {
-    for (int y=0; y<VideoHeight; y++) {
-      FrameBuffer[x][y]=0;
+void BuildFrameBuffer(int FrameIndex) {
+
+  for (int x = 0; x < VideoWidth; x++) {
+    for (int y = 0; y < VideoHeight; y++) {
+      FrameBuffer[x][y] = 0;
     }
   }
-  int[][] Rectangles = Frames[CurrentFrame];
-  for (int i=0; i<Rectangles.length; i++) {
+
+  int[][] Rectangles = Frames[FrameIndex];
+
+  for (int i = 0; i < Rectangles.length; i++) {
+
     int rx = Rectangles[i][0];
     int ry = Rectangles[i][1];
     int rw = Rectangles[i][2];
     int rh = Rectangles[i][3];
-    for (int x=rx; x<rx+rw; x++)
-      for (int y=ry; y<ry+rh; y++) {
-        if (x>=0 && x<VideoWidth && y>=0 && y<VideoHeight) {
-          FrameBuffer[x][y]=255;
+
+    for (int x = rx; x < rx + rw; x++) {
+      for (int y = ry; y < ry + rh; y++) {
+
+        if (x >= 0 && x < VideoWidth && y >= 0 && y < VideoHeight) {
+          FrameBuffer[x][y] = 255;
         }
       }
-  }
-  CurrentFrame++;
-  if (CurrentFrame>=Frames.length) {
-    CurrentFrame=0;
+    }
   }
 }
 
@@ -276,8 +283,20 @@ void ClearZBuffer() {
 void draw() {
   //RotX += AngleToRad(1);
   //RotY += AngleToRad(1);
-  Frame += 1;
-  BuildFrameBuffer();
+  long elapsed = System.currentTimeMillis() - VideoStartTime;
+
+  int TargetFrame = (int)((elapsed / 1000.0) * FPS);
+
+  if (TargetFrame >= Frames.length) {
+    TargetFrame = Frames.length - 1;
+  }
+
+  if (TargetFrame != LastBuiltFrame) {
+    BuildFrameBuffer(TargetFrame);
+    LastBuiltFrame = TargetFrame;
+    CurrentFrame = TargetFrame;
+  }
+
   background(122, 122, 122);
   ClearZBuffer();
   float[][] CurrentVerts = new float[Verticies.length][3];
@@ -297,7 +316,7 @@ boolean IsInsideTriangle(float Px, float Py, float[] VertA, float[] VertB, float
     return false;
   }
   float WeightC = 1 - WeightA - WeightB;
-  if (WeightC < 0){
+  if (WeightC < 0) {
     return false;
   }
   OutWeights[0] = WeightA;
@@ -305,9 +324,9 @@ boolean IsInsideTriangle(float Px, float Py, float[] VertA, float[] VertB, float
   OutWeights[2] = WeightC;
   return true;
 }
-float GetMinOf(float[] Values){
+float GetMinOf(float[] Values) {
   float MinValue = Values[0];
-  for (int i = 1; i < Values.length; i++){
+  for (int i = 1; i < Values.length; i++) {
     if (Values[i] < MinValue) {
       MinValue = Values[i];
     }
@@ -317,8 +336,8 @@ float GetMinOf(float[] Values){
 
 float GetMaxOf(float[] Values) {
   float MaxValue = Values[0];
-  for (int i = 1; i < Values.length; i++){
-    if (Values[i] > MaxValue){
+  for (int i = 1; i < Values.length; i++) {
+    if (Values[i] > MaxValue) {
       MaxValue = Values[i];
     }
   }
@@ -486,11 +505,11 @@ void DrawFaces(float[][] V) {
 
           int VideoX = constrain(RawVideoX, 0, ConvertedWidth);
           int VideoY = constrain(RawVideoY, 0, ConvertedHeight);
-
-          if (FrameBuffer[VideoX][VideoY] == 255)
+          if (FrameBuffer[VideoX][VideoY] == 255) {
             set(PixelX, PixelY, color(255, 255, 255));
-          else
+          } else {
             set(PixelX, PixelY, color(0, 0, 0));
+          }
         } else {
           set(PixelX, PixelY, color(RedBase, GreenBase, BlueBase));
         }
