@@ -357,6 +357,9 @@ void DrawFaces(float[][] V) {
   int Screen1 = 1322;
   int Screen2 = 1323;
 
+  int Screen3 = 998;
+  int Screen4 = 999;
+
   int FaceCount = Faces.length;
 
   float[] Weights = new float[3];
@@ -391,6 +394,9 @@ void DrawFaces(float[][] V) {
     int cx = (int)ScreenC[0];
     int cy = (int)ScreenC[1];
 
+    if ((ax < 0 && bx < 0 && cx < 0) || (ax >= width && bx >= width && cx >= width) || (ay < 0 && by < 0 && cy < 0) || (ay >= height && by >= height && cy >= height)) {
+      continue;
+    }
     int MinimumX = max(0, min(ax, min(bx, cx)));
     int MaximumX = min(width - 1, max(ax, max(bx, cx)));
 
@@ -399,7 +405,9 @@ void DrawFaces(float[][] V) {
 
     float denom = (ScreenB[1] - ScreenC[1]) * (ScreenA[0] - ScreenC[0]) + (ScreenC[0] - ScreenB[0]) * (ScreenA[1] - ScreenC[1]);
 
-    if (denom == 0) continue;
+    if (denom == 0) {
+      continue;
+    }
 
     float InverseDenom = 1.0 / denom;
 
@@ -429,28 +437,51 @@ void DrawFaces(float[][] V) {
 
     float Brightness = NormalX * LightDirectionX + NormalY * LightDirectionY + NormalZ * LightDirectionZ;
 
-    if (Brightness < 0) Brightness = 0;
+    if (Brightness < 0) {
+      Brightness = 0;
+    }
+
     Brightness = 0.2 + Brightness * 0.8;
 
     float InverseA = 1.0 / DepthA;
     float InverseB = 1.0 / DepthB;
     float InverseC = 1.0 / DepthC;
 
-    boolean IsScreenFace = (FaceIndex == Screen1 || FaceIndex == Screen2);
+    boolean IsScreenA = (FaceIndex == Screen1 || FaceIndex == Screen2);
+    boolean IsScreenB = (FaceIndex == Screen3 || FaceIndex == Screen4);
+    boolean IsScreenFace = IsScreenA || IsScreenB;
 
     float MinPX=0, MaxPX=0, MinPY=0, MaxPY=0;
 
     if (IsScreenFace) {
+      int q1, q2, q3, q4, q5, q6;
+      if (IsScreenA) {
+        q1 = Faces[Screen1][0];
+        q2 = Faces[Screen1][1];
+        q3 = Faces[Screen1][2];
 
-      int q1 = Faces[Screen1][0];
-      int q2 = Faces[Screen1][1];
-      int q3 = Faces[Screen1][2];
+        q4 = Faces[Screen2][0];
+        q5 = Faces[Screen2][1];
+        q6 = Faces[Screen2][2];
+      } else {
+        q1 = Faces[Screen3][0];
+        q2 = Faces[Screen3][1];
+        q3 = Faces[Screen3][2];
 
-      int q4 = Faces[Screen2][0];
-      int q5 = Faces[Screen2][1];
-      int q6 = Faces[Screen2][2];
-      float[] PxValues = {Verticies[q1][0], Verticies[q2][0], Verticies[q3][0], Verticies[q4][0], Verticies[q5][0], Verticies[q6][0]};
-      float[] PyValues = {Verticies[q1][1], Verticies[q2][1], Verticies[q3][1], Verticies[q4][1], Verticies[q5][1], Verticies[q6][1]};
+        q4 = Faces[Screen4][0];
+        q5 = Faces[Screen4][1];
+        q6 = Faces[Screen4][2];
+      }
+
+      float[] PxValues = {
+        Verticies[q1][0], Verticies[q2][0], Verticies[q3][0],
+        Verticies[q4][0], Verticies[q5][0], Verticies[q6][0]
+      };
+
+      float[] PyValues = {
+        Verticies[q1][1], Verticies[q2][1], Verticies[q3][1],
+        Verticies[q4][1], Verticies[q5][1], Verticies[q6][1]
+      };
 
       MinPX = GetMinOf(PxValues);
       MaxPX = GetMaxOf(PxValues);
@@ -505,7 +536,13 @@ void DrawFaces(float[][] V) {
 
           int VideoX = constrain(RawVideoX, 0, ConvertedWidth);
           int VideoY = constrain(RawVideoY, 0, ConvertedHeight);
-          if (FrameBuffer[VideoX][VideoY] == 255) {
+          int val = FrameBuffer[VideoX][VideoY];
+
+          if (IsScreenB) {
+          val = FrameBuffer[ConvertedWidth-VideoX][VideoY];
+            val = (val == 255) ? 0 : 255;
+          }
+          if (val == 255) {
             set(PixelX, PixelY, color(255, 255, 255));
           } else {
             set(PixelX, PixelY, color(0, 0, 0));
