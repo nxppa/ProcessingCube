@@ -32,19 +32,7 @@ int[][] FaceColourRanges = {
   {1035, 2000, 20, 20, 20}, // right monitor
 };
 
-color[] EdgeColours = {
-  color(255, 0, 0),
-  color(255, 128, 0),
-  color(255, 255, 0),
-  color(0, 255, 0),
-  color(0, 255, 255),
-  color(0, 0, 255),
-  color(128, 0, 255),
-  color(255, 0, 255),
-  color(255, 100, 100),
-  color(100, 255, 100),
-  color(100, 100, 255),
-  color(255, 255, 255) };
+
 int VideoWidth;
 int VideoHeight;
 int FPS;
@@ -245,7 +233,13 @@ float[] TransformVertex(float[] Vert) {
 
   return new float[]{FinalX + PosXOffset, FinalY + PosYOffset, FinalZ + PosZOffset};
 }
-
+int ToHex(int r, int g, int b) {
+  r = constrain(r, 0, 255);
+  g = constrain(g, 0, 255);
+  b = constrain(b, 0, 255);
+  int alpha = 255;
+  return alpha * 16777216 + r * 65536 +g * 256 + b;
+}
 int[] GetFaceColour(int FaceIndex) {
   for (int i = 0; i < FaceColourRanges.length; i++) {
     int start = FaceColourRanges[i][0];
@@ -253,9 +247,9 @@ int[] GetFaceColour(int FaceIndex) {
 
     if (FaceIndex >= start && FaceIndex <= end) {
       return new int[]{
-        FaceColourRanges[i][2], // R
-        FaceColourRanges[i][3], // G
-        FaceColourRanges[i][4]  // B
+        FaceColourRanges[i][2],
+        FaceColourRanges[i][3],
+        FaceColourRanges[i][4]
       };
     }
   }
@@ -553,20 +547,10 @@ void DrawFaces(float[][] V) {
           }
           pixels[PixelIndex] = (val == 255) ? 0xFFFFFFFF : 0xFF000000;
         } else {
-          int r = (int)RedOut;
-          int g = (int)GreenOut;
-          int b = (int)BlueOut;
-
-          int alpha = 255;
-
-          int AlphaPart = alpha * 16777216;
-          int RedPart   = r   * 65536;
-          int GreenPart = g * 256;
-          int BluePart  = b;
-
-          int ColorValue = AlphaPart + RedPart + GreenPart + BluePart;
-
-          pixels[PixelIndex] = ColorValue;
+          int r = (int) RedOut;
+          int g = (int) GreenOut;
+          int b = (int) BlueOut;
+          pixels[PixelIndex] = ToHex(r, g, b);
         }
       }
     }
