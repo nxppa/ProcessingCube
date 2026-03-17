@@ -49,6 +49,7 @@ int VideoWidth;
 int VideoHeight;
 int FPS;
 boolean PrintedTriangleThisFrame = false;
+boolean HoldingH = false;
 
 long VideoStartTime;
 int LastBuiltFrame = -1;
@@ -139,25 +140,19 @@ int[][][] ParseMedia(String media) {
 int CurrentFrame = 0;
 
 void BuildFrameBuffer(int FrameIndex) {
-
   for (int x = 0; x < VideoWidth; x++) {
     for (int y = 0; y < VideoHeight; y++) {
       FrameBuffer[x][y] = 0;
     }
   }
-
   int[][] Rectangles = Frames[FrameIndex];
-
   for (int i = 0; i < Rectangles.length; i++) {
-
     int rx = Rectangles[i][0];
     int ry = Rectangles[i][1];
     int rw = Rectangles[i][2];
     int rh = Rectangles[i][3];
-
     for (int x = rx; x < rx + rw; x++) {
       for (int y = ry; y < ry + rh; y++) {
-
         if (x >= 0 && x < VideoWidth && y >= 0 && y < VideoHeight) {
           FrameBuffer[x][y] = 255;
         }
@@ -182,10 +177,9 @@ void LoadOBJ(String FilePath) {
       float x = float(t[1]);
       float y = -float(t[2]);
       float z = float(t[3]);
-      TempVerts[VertCount] = new float[]{x + PosXOffset, y + PosYOffset, - (z + PosZOffset)};
+      TempVerts[VertCount] = new float[]{x, y, - z};
       VertCount += 1;
     }
-
     if (CurrentLine.startsWith("vt ")) {
       String[] t = split(CurrentLine, ' ');
       float u = float(t[1]);
@@ -193,7 +187,6 @@ void LoadOBJ(String FilePath) {
       TempUVs[UVCount] = new float[]{u, v};
       UVCount += 1;
     }
-
     if (CurrentLine.startsWith("f ")) {
       String[] t = split(CurrentLine, ' ');
       int n = t.length - 1;
@@ -210,7 +203,6 @@ void LoadOBJ(String FilePath) {
       }
     }
   }
-
   Verticies = new float[VertCount][3];
   for (int i = 0; i < VertCount; i++) {
     Verticies[i] = TempVerts[i];
@@ -251,7 +243,7 @@ float[] TransformVertex(float[] Vert) {
   float FinalY = RotYY;
   float FinalZ = RotYZ + CamDist;
 
-  return new float[]{FinalX, FinalY, FinalZ};
+  return new float[]{FinalX + PosXOffset, FinalY + PosYOffset, FinalZ + PosZOffset};
 }
 
 color GetFaceColor(int FaceIndex) {
@@ -284,19 +276,14 @@ void draw() {
   //RotX += AngleToRad(1);
   //RotY += AngleToRad(1);
   long elapsed = System.currentTimeMillis() - VideoStartTime;
-
   int TargetFrame = (int)((elapsed / 1000.0) * FPS);
-
-  if (TargetFrame >= Frames.length) {
-    TargetFrame = Frames.length - 1;
-  }
+  TargetFrame = TargetFrame % Frames.length;
 
   if (TargetFrame != LastBuiltFrame) {
     BuildFrameBuffer(TargetFrame);
     LastBuiltFrame = TargetFrame;
     CurrentFrame = TargetFrame;
   }
-
   background(122, 122, 122);
   ClearZBuffer();
   float[][] CurrentVerts = new float[Verticies.length][3];
@@ -306,6 +293,8 @@ void draw() {
   PrintedTriangleThisFrame = false;
   DrawFaces(CurrentVerts);
 }
+
+
 boolean IsInsideTriangle(float Px, float Py, float[] VertA, float[] VertB, float[] VertC, float InvDenom, float[] OutWeights) {
   float WeightA = ((VertB[1] - VertC[1]) * (Px - VertC[0]) + (VertC[0] - VertB[0]) * (Py - VertC[1])) * InvDenom;
   if (WeightA < 0) {
@@ -387,25 +376,29 @@ void DrawFaces(float[][] V) {
     float[] ScreenB = WorldToScreen(VertexB);
     float[] ScreenC = WorldToScreen(VertexC);
 
-    int ax = (int)ScreenA[0];
-    int ay = (int)ScreenA[1];
-    int bx = (int)ScreenB[0];
-    int by = (int)ScreenB[1];
-    int cx = (int)ScreenC[0];
-    int cy = (int)ScreenC[1];
+    int ScreenAX = (int)ScreenA[0];
+    int ScreenAY = (int)ScreenA[1];
 
-    if ((ax < 0 && bx < 0 && cx < 0) || (ax >= width && bx >= width && cx >= width) || (ay < 0 && by < 0 && cy < 0) || (ay >= height && by >= height && cy >= height)) {
+    int ScreenBX = (int)ScreenB[0];
+    int ScreenBY = (int)ScreenB[1];
+
+    int ScreenCX = (int)ScreenC[0];
+    int ScreenCY = (int)ScreenC[1];
+
+    if ((ScreenAX < 0 && ScreenBX < 0 && ScreenCX < 0) || (ScreenAX >= width && ScreenBX >= width && ScreenCX >= width) || (ScreenAY < 0 && ScreenBY < 0 && ScreenCY < 0) || (ScreenAY >= height && ScreenBY >= height && ScreenCY >= height)) {
+      //if off screen
       continue;
     }
-    int MinimumX = max(0, min(ax, min(bx, cx)));
-    int MaximumX = min(width - 1, max(ax, max(bx, cx)));
+    int MinimumX = max(0, min(ScreenAX, min(ScreenBX, ScreenCX)));
+    int MaximumX = min(width - 1, max(ScreenAX, max(ScreenBX, ScreenCX)));
 
-    int MinimumY = max(0, min(ay, min(by, cy)));
-    int MaximumY = min(height - 1, max(ay, max(by, cy)));
+    int MinimumY = max(0, min(ScreenAY, min(ScreenBY, ScreenCY)));
+    int MaximumY = min(height - 1, max(ScreenAY, max(ScreenBY, ScreenCY)));
 
     float denom = (ScreenB[1] - ScreenC[1]) * (ScreenA[0] - ScreenC[0]) + (ScreenC[0] - ScreenB[0]) * (ScreenA[1] - ScreenC[1]);
 
     if (denom == 0) {
+      //if no area skip
       continue;
     }
 
@@ -539,7 +532,7 @@ void DrawFaces(float[][] V) {
           int val = FrameBuffer[VideoX][VideoY];
 
           if (IsScreenB) {
-          val = FrameBuffer[ConvertedWidth-VideoX][VideoY];
+            val = FrameBuffer[ConvertedWidth-VideoX][VideoY];
             val = (val == 255) ? 0 : 255;
           }
           if (val == 255) {
@@ -556,12 +549,32 @@ void DrawFaces(float[][] V) {
 }
 
 void mouseDragged() {
-  float Scale=0.01;
-  RotY+=(mouseX-pmouseX)*Scale;
-  RotX+=(mouseY-pmouseY)*Scale;
-}
+  float RotateScale = 0.01;
+  float MoveScale = .1;
 
+  float MouseDeltaX = mouseX - pmouseX;
+  float MouseDeltaY = mouseY - pmouseY;
+
+  if (HoldingH) {
+    PosXOffset += MouseDeltaX * MoveScale;
+    PosYOffset += MouseDeltaY * MoveScale;
+  } else {
+    RotY += MouseDeltaX * RotateScale;
+    RotX += MouseDeltaY * RotateScale;
+  }
+}
 void mouseWheel(MouseEvent Amount) {
   CamDist+=Amount.getCount()*MaxDistance/20;
   CamDist=max(0, CamDist);
+}
+void keyPressed() {
+  if (key == 'h' || key == 'H') {
+    HoldingH = true;
+  }
+}
+
+void keyReleased() {
+  if (key == 'h' || key == 'H') {
+    HoldingH = false;
+  }
 }
