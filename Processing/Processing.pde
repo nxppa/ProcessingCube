@@ -246,17 +246,21 @@ float[] TransformVertex(float[] Vert) {
   return new float[]{FinalX + PosXOffset, FinalY + PosYOffset, FinalZ + PosZOffset};
 }
 
-color GetFaceColor(int FaceIndex) {
+int[] GetFaceColour(int FaceIndex) {
   for (int i = 0; i < FaceColourRanges.length; i++) {
     int start = FaceColourRanges[i][0];
     int end   = FaceColourRanges[i][1];
+
     if (FaceIndex >= start && FaceIndex <= end) {
-      return color(FaceColourRanges[i][2], FaceColourRanges[i][3], FaceColourRanges[i][4]);
+      return new int[]{
+        FaceColourRanges[i][2], // R
+        FaceColourRanges[i][3], // G
+        FaceColourRanges[i][4]  // B
+      };
     }
   }
-  return color(255, 0, 255); // pink if not found
+  return new int[]{255, 0, 255};
 }
-
 float[] WorldToScreen(float[] p) {
   float scale = 200;
   float sx = (p[0]/p[2])*scale + width/2;
@@ -272,9 +276,15 @@ void ClearZBuffer() {
   }
 }
 
+void ClearBackground(int HexColour) {
+  for (int i = 0; i < pixels.length; i++) {
+    pixels[i] = HexColour;
+  }
+}
 void draw() {
   //RotX += AngleToRad(1);
   //RotY += AngleToRad(1);
+  loadPixels();
   long elapsed = System.currentTimeMillis() - VideoStartTime;
   int TargetFrame = (int)((elapsed / 1000.0) * FPS);
   TargetFrame = TargetFrame % Frames.length;
@@ -284,7 +294,8 @@ void draw() {
     LastBuiltFrame = TargetFrame;
     CurrentFrame = TargetFrame;
   }
-  background(122, 122, 122);
+  ClearBackground(0xFF7A7A7A);
+
   ClearZBuffer();
   float[][] CurrentVerts = new float[Verticies.length][3];
   for (int i=0; i<Verticies.length; i++) {
@@ -292,6 +303,7 @@ void draw() {
   }
   PrintedTriangleThisFrame = false;
   DrawFaces(CurrentVerts);
+  updatePixels();
 }
 
 
@@ -483,11 +495,11 @@ void DrawFaces(float[][] V) {
       MaxPY = GetMaxOf(PyValues);
     }
 
-    int BaseColor = GetFaceColor(FaceIndex);
+    int[] BaseColor = GetFaceColour(FaceIndex);
 
-    int RedBase = (int)(((BaseColor >> 16) & 255) * Brightness);
-    int GreenBase = (int)(((BaseColor >> 8) & 255) * Brightness);
-    int BlueBase = (int)((BaseColor & 255) * Brightness);
+    float RedOut = BaseColor[0] * Brightness;
+    float GreenOut = BaseColor[1] * Brightness;
+    float BlueOut  = BaseColor[2] * Brightness;
 
     for (int PixelY = MinimumY; PixelY <= MaximumY; PixelY++) {
       float py = PixelY + 0.5;
@@ -508,40 +520,53 @@ void DrawFaces(float[][] V) {
 
         float InverseDepth = w1 * InverseA + w2 * InverseB + w3 * InverseC;
 
-        float DepthValue = 1.0 / InverseDepth;
+        float RealDepthValue = 1.0 / InverseDepth;
 
-        if (DepthValue >= ZBuffer[PixelX][PixelY]) {
+        if (RealDepthValue >= ZBuffer[PixelX][PixelY]) {
           continue;
         }
 
-        ZBuffer[PixelX][PixelY] = DepthValue;
+        ZBuffer[PixelX][PixelY] = RealDepthValue;
+        int PixelIndex = PixelY * width + PixelX;
+
         if (IsScreenFace) {
           float PointX2D = w1*ModelVertexA[0] + w2*ModelVertexB[0] + w3*ModelVertexC[0];
           float PointY2D = w1*ModelVertexA[1] + w2*ModelVertexB[1] + w3*ModelVertexC[1];
+
           float u = (PointX2D - MinPX) / (MaxPX - MinPX);
           float v = (PointY2D - MinPY) / (MaxPY - MinPY);
 
           int ConvertedWidth  = VideoWidth  - 1;
           int ConvertedHeight = VideoHeight - 1;
 
-          int RawVideoX = (int) (u * ConvertedWidth);
-          int RawVideoY = (int) (v * ConvertedHeight);
+          int RawVideoX = (int)(u * ConvertedWidth);
+          int RawVideoY = (int)(v * ConvertedHeight);
 
           int VideoX = constrain(RawVideoX, 0, ConvertedWidth);
           int VideoY = constrain(RawVideoY, 0, ConvertedHeight);
+
           int val = FrameBuffer[VideoX][VideoY];
 
           if (IsScreenB) {
-            val = FrameBuffer[ConvertedWidth-VideoX][VideoY];
+            val = FrameBuffer[ConvertedWidth - VideoX][VideoY];
             val = (val == 255) ? 0 : 255;
           }
-          if (val == 255) {
-            set(PixelX, PixelY, color(255, 255, 255));
-          } else {
-            set(PixelX, PixelY, color(0, 0, 0));
-          }
+          pixels[PixelIndex] = (val == 255) ? 0xFFFFFFFF : 0xFF000000;
         } else {
-          set(PixelX, PixelY, color(RedBase, GreenBase, BlueBase));
+          int r = (int)RedOut;
+          int g = (int)GreenOut;
+          int b = (int)BlueOut;
+
+          int alpha = 255;
+
+          int AlphaPart = alpha * 16777216;
+          int RedPart   = r   * 65536;
+          int GreenPart = g * 256;
+          int BluePart  = b;
+
+          int ColorValue = AlphaPart + RedPart + GreenPart + BluePart;
+
+          pixels[PixelIndex] = ColorValue;
         }
       }
     }
