@@ -38,6 +38,14 @@ int VideoHeight;
 int FPS;
 boolean PrintedTriangleThisFrame = false;
 boolean HoldingH = false;
+int RenderType = 1;
+
+String[] RenderTypeMap = {
+  "Wire Frame",
+  "Full Render"
+};
+
+
 
 long VideoStartTime;
 int LastBuiltFrame = -1;
@@ -289,7 +297,7 @@ void draw() {
     CurrentFrame = TargetFrame;
   }
   ClearBackground(0xFF7A7A7A);
-
+  String BaseText = "Rendering Type: " + RenderTypeMap[RenderType];
   ClearZBuffer();
   float[][] CurrentVerts = new float[Verticies.length][3];
   for (int i=0; i<Verticies.length; i++) {
@@ -298,6 +306,8 @@ void draw() {
   PrintedTriangleThisFrame = false;
   DrawFaces(CurrentVerts);
   updatePixels();
+  textSize(30);
+  text(BaseText, 100, 100);
 }
 
 
@@ -338,6 +348,7 @@ float GetMaxOf(float[] Values) {
   }
   return MaxValue;
 }
+
 void DrawFaces(float[][] V) {
   float LightDirectionX = -0.5;
   float LightDirectionY = 1;
@@ -390,7 +401,17 @@ void DrawFaces(float[][] V) {
 
     int ScreenCX = (int)ScreenC[0];
     int ScreenCY = (int)ScreenC[1];
+    if (RenderType == 0){
+      // only draw wireframe
+      line(ScreenAX, ScreenAY, ScreenBX, ScreenBY);
+      line(ScreenBX, ScreenBY, ScreenCX, ScreenCY);
+      line(ScreenCX, ScreenCY, ScreenAX, ScreenAY);
+      println(ScreenAX,ScreenAY, ScreenBX, ScreenBY);
+      stroke(255);
 
+      continue;
+    }
+    
     if ((ScreenAX < 0 && ScreenBX < 0 && ScreenCX < 0) || (ScreenAX >= width && ScreenBX >= width && ScreenCX >= width) || (ScreenAY < 0 && ScreenBY < 0 && ScreenCY < 0) || (ScreenAY >= height && ScreenBY >= height && ScreenCY >= height)) {
       //if off screen
       continue;
@@ -580,6 +601,11 @@ void keyPressed() {
   if (key == 'h' || key == 'H') {
     HoldingH = true;
   }
+
+  if (key == 'k' || key == 'k') {
+    RenderType += 1;
+  }
+  RenderType %= 2;
 }
 
 void keyReleased() {
