@@ -220,7 +220,11 @@ void LoadOBJ(String FilePath) {
   }
   CamDist = MaxDistance * 1;
 }
-
+float Round(float Value, int Places)
+{
+    float Scale = (float) Math.pow(10, Places);
+    return Math.round(Value * Scale) / Scale;
+}
 float[] TransformVertex(float[] Vert) {
 
   float X = Vert[0];
@@ -298,6 +302,9 @@ void draw() {
   }
   ClearBackground(0xFF7A7A7A);
   String BaseText = "Rendering Type: " + RenderTypeMap[RenderType];
+  String RotInfo = "Rotation: " + Round(RotX, 2) + ", " + Round(RotY, 2) + ", " + Round(RotZ, 2);
+  String FacesInfo = "Triangles: " + Faces.length;  
+
   ClearZBuffer();
   float[][] CurrentVerts = new float[Verticies.length][3];
   for (int i=0; i<Verticies.length; i++) {
@@ -307,7 +314,10 @@ void draw() {
   DrawFaces(CurrentVerts);
   updatePixels();
   textSize(30);
-  text(BaseText, 100, 100);
+  text(BaseText, 20, 30);
+  text(RotInfo, 20, 70);
+  text(FacesInfo, 20, 110);
+  
 }
 
 
@@ -349,6 +359,53 @@ float GetMaxOf(float[] Values) {
   return MaxValue;
 }
 
+int[][] BresLine(int StartX, int StartY, int EndX, int EndY) {
+  int DeltaX = Math.abs(EndX - StartX);
+  int DeltaY = Math.abs(EndY - StartY);
+  int StepX = (StartX < EndX) ? 1 : -1;
+  int StepY = (StartY < EndY) ? 1 : -1;
+  int Error = DeltaX - DeltaY;
+  int MaxPoints = Math.max(DeltaX, DeltaY) + 1;
+  int[][] Points = new int[MaxPoints][2];
+  int CurrentX = StartX;
+  int CurrentY = StartY;
+  int Index = 0;
+  while (true) {
+    Points[Index][0] = CurrentX;
+    Points[Index][1] = CurrentY;
+    Index++;
+    if (CurrentX == EndX && CurrentY == EndY) {
+      break;
+    }
+    int DoubledError = 2 * Error;
+    if (DoubledError > -DeltaY) {
+      Error -= DeltaY;
+      CurrentX += StepX;
+    }
+    if (DoubledError < DeltaX) {
+      Error += DeltaX;
+      CurrentY += StepY;
+    }
+  }
+  int[][] Result = new int[Index][2];
+  for (int i = 0; i < Index; i++) {
+    Result[i][0] = Points[i][0];
+    Result[i][1] = Points[i][1];
+  }
+  return Result;
+}
+
+void DrawLine(int x1, int y1, int x2, int y2){
+  int[][] Line = BresLine(x1, y1, x2, y2);
+  for (int i = 0; i < Line.length; i++) {
+    int XPos = Line[i][0];
+    int YPos = Line[i][1];
+    int PixelIndex = YPos * width + XPos;
+    if (XPos > 0 && XPos < width && YPos > 0 && YPos < height){
+      pixels[PixelIndex] = 0xFFFFFFFF;
+    }
+  }
+}
 void DrawFaces(float[][] V) {
   float LightDirectionX = -0.5;
   float LightDirectionY = 1;
@@ -401,17 +458,7 @@ void DrawFaces(float[][] V) {
 
     int ScreenCX = (int)ScreenC[0];
     int ScreenCY = (int)ScreenC[1];
-    if (RenderType == 0){
-      // only draw wireframe
-      line(ScreenAX, ScreenAY, ScreenBX, ScreenBY);
-      line(ScreenBX, ScreenBY, ScreenCX, ScreenCY);
-      line(ScreenCX, ScreenCY, ScreenAX, ScreenAY);
-      println(ScreenAX,ScreenAY, ScreenBX, ScreenBY);
-      stroke(255);
 
-      continue;
-    }
-    
     if ((ScreenAX < 0 && ScreenBX < 0 && ScreenCX < 0) || (ScreenAX >= width && ScreenBX >= width && ScreenCX >= width) || (ScreenAY < 0 && ScreenBY < 0 && ScreenCY < 0) || (ScreenAY >= height && ScreenBY >= height && ScreenCY >= height)) {
       //if off screen
       continue;
@@ -426,6 +473,14 @@ void DrawFaces(float[][] V) {
 
     if (denom == 0) {
       //if no area skip
+      continue;
+    }
+    if (RenderType == 0) {
+      // only draw wireframe
+      DrawLine(ScreenAX, ScreenAY, ScreenBX, ScreenBY);
+      DrawLine(ScreenBX, ScreenBY, ScreenCX, ScreenCY);
+      DrawLine(ScreenCX, ScreenCY, ScreenAX, ScreenAY);
+
       continue;
     }
 
