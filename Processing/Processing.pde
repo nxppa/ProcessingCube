@@ -304,6 +304,7 @@ void draw() {
   String BaseText = "Rendering Type: " + RenderTypeMap[RenderType];
   String RotInfo = "Rotation: " + Round(RotX, 2) + ", " + Round(RotY, 2) + ", " + Round(RotZ, 2);
   String FacesInfo = "Triangles: " + Faces.length;  
+  String FPSInfo = "FPS: " + (int) Round(frameRate, 0);
 
   ClearZBuffer();
   float[][] CurrentVerts = new float[Verticies.length][3];
@@ -317,7 +318,7 @@ void draw() {
   text(BaseText, 20, 30);
   text(RotInfo, 20, 70);
   text(FacesInfo, 20, 110);
-  
+  text(FPSInfo, 20, 150);
 }
 
 
@@ -480,7 +481,6 @@ void DrawFaces(float[][] V) {
       DrawLine(ScreenAX, ScreenAY, ScreenBX, ScreenBY);
       DrawLine(ScreenBX, ScreenBY, ScreenCX, ScreenCY);
       DrawLine(ScreenCX, ScreenCY, ScreenAX, ScreenAY);
-
       continue;
     }
 
