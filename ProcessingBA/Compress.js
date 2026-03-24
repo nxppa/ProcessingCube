@@ -53,35 +53,20 @@ spawnSync(
 );
 
 
-function RLERows(Buffer, Width, Height, Channels)
-{
+function RLERows(Buffer, Width, Height, Channels){
   const Rectangles = [];
-
-  function PixelIndex(X, Y)
-  {
+  function PixelIndex(X, Y){
     return (Y * Width + X) * Channels;
   }
-
-  for (let Y = 0; Y < Height; Y++)
-  {
+  for (let Y = 0; Y < Height; Y++){
     let X = 0;
-
-    while (X < Width)
-    {
+    while (X < Width){
       const PixelValue = Buffer[PixelIndex(X, Y)];
-
       let RunLength = 1;
-
-      while (
-        X + RunLength < Width &&
-        Buffer[PixelIndex(X + RunLength, Y)] === PixelValue
-      )
-      {
-        RunLength++;
+      while (X + RunLength < Width && Buffer[PixelIndex(X + RunLength, Y)] === PixelValue){
+        RunLength += 1;
       }
-
-      if (PixelValue === 255)
-      {
+      if (PixelValue === 255){
         Rectangles.push({
           x: X,
           y: Y,
@@ -89,67 +74,46 @@ function RLERows(Buffer, Width, Height, Channels)
           h: 1
         });
       }
-
       X += RunLength;
     }
   }
-
   return Rectangles;
 }
 
 
-function encodeRect(r)
-{
+function encodeRect(r){
   const buf = Buffer.alloc(8);
-
   buf.writeUInt16BE(r.x, 0);
   buf.writeUInt16BE(r.y, 2);
   buf.writeUInt16BE(r.w, 4);
   buf.writeUInt16BE(r.h, 6);
-
   return buf.toString('base64');
 }
 
-
 console.log('Compressing frames…');
-
 const files = fs
   .readdirSync(TMPDIR)
   .filter(f => f.endsWith('.png'))
   .sort();
 
 const FrameStrings = [];
-
-for (const fname of files)
-{
+for (const fname of files){
   const PNGPath = path.join(TMPDIR, fname);
-
   const { data, info } = await sharp(PNGPath)
     .raw()
     .toBuffer({ resolveWithObject: true });
-
   const rects = RLERows(data, info.width, info.height, info.channels);
-
   const encodedRects = rects
     .map(encodeRect)
     .join(',');
-
   FrameStrings.push(encodedRects);
-
   fs.unlinkSync(PNGPath);
 }
-
-
 fs.rmSync(TMPDIR, { recursive: true });
-
-
 const finalString = FrameStrings.join('|');
-
 const header = `${WIDTH},${HEIGHT},${FPS}\n`;
-
 fs.writeFileSync(
   OUTFILE,
   header + finalString
 );
-
 console.log('done');

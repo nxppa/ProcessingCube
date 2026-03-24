@@ -220,11 +220,12 @@ void LoadOBJ(String FilePath) {
   }
   CamDist = MaxDistance * 1;
 }
-float Round(float Value, int Places)
-{
+
+float Round(float Value, int Places){
     float Scale = (float) Math.pow(10, Places);
     return Math.round(Value * Scale) / Scale;
 }
+
 float[] TransformVertex(float[] Vert) {
 
   float X = Vert[0];
