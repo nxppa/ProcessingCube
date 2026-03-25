@@ -17,6 +17,7 @@ int[][] Faces;
 float[][] ZBuffer;
 
 int Frame = 0;
+int TriTally = 0;;
 
 String Media;
 int[][][] Frames;
@@ -67,7 +68,7 @@ void LoadMedia() {
   String Path = "../ProcessingBA/data/media.txt";
   String[] lines = loadStrings(Path);
   Music = new SoundFile(this, "../ProcessingBA/Media/BA.wav");
-  Music.play();
+  //Music.play();
   String[] Header = split(lines[0], ',');
   VideoWidth = int(Header[0]);
   VideoHeight = int(Header[1]);
@@ -221,9 +222,9 @@ void LoadOBJ(String FilePath) {
   CamDist = MaxDistance * 1;
 }
 
-float Round(float Value, int Places){
-    float Scale = (float) Math.pow(10, Places);
-    return Math.round(Value * Scale) / Scale;
+float Round(float Value, int Places) {
+  float Scale = (float) Math.pow(10, Places);
+  return Math.round(Value * Scale) / Scale;
 }
 
 float[] TransformVertex(float[] Vert) {
@@ -304,7 +305,9 @@ void draw() {
   ClearBackground(0xFF7A7A7A);
   String BaseText = "Rendering Type: " + RenderTypeMap[RenderType];
   String RotInfo = "Rotation: " + Round(RotX, 2) + ", " + Round(RotY, 2) + ", " + Round(RotZ, 2);
-  String FacesInfo = "Triangles: " + Faces.length;  
+  String OffInfo = "Offset: " + Round(PosXOffset, 2) + ", " + Round(PosYOffset, 2) + ", " + Round(PosZOffset, 2);
+
+  String FacesInfo = "Triangles drawn: " + TriTally;
   String FPSInfo = "FPS: " + (int) Round(frameRate, 0);
 
   ClearZBuffer();
@@ -318,8 +321,9 @@ void draw() {
   textSize(30);
   text(BaseText, 20, 30);
   text(RotInfo, 20, 70);
-  text(FacesInfo, 20, 110);
-  text(FPSInfo, 20, 150);
+  text(OffInfo, 20, 110);
+  text(FacesInfo, 20, 150);
+  text(FPSInfo, 20, 180);
 }
 
 
@@ -396,19 +400,34 @@ int[][] BresLine(int StartX, int StartY, int EndX, int EndY) {
   }
   return Result;
 }
+int[] GetColourFromSeed(int[] Seed) {
+    if (Seed == null || Seed.length != 4) {
+        throw new IllegalArgumentException("Seed must contain exactly 4 integers.");
+    }
+    int[] Result = new int[3];
+    Result[0] = Math.abs(Seed[0] * 31 + Seed[1] * 17) % 256;
+    Result[1] = Math.abs(Seed[1] * 29 + Seed[2] * 19) % 256;
+    Result[2] = Math.abs(Seed[2] * 23 + Seed[3] * 13) % 256;
 
-void DrawLine(int x1, int y1, int x2, int y2){
+    return Result;
+}
+void DrawLine(int x1, int y1, int x2, int y2) {
   int[][] Line = BresLine(x1, y1, x2, y2);
   for (int i = 0; i < Line.length; i++) {
     int XPos = Line[i][0];
     int YPos = Line[i][1];
     int PixelIndex = YPos * width + XPos;
-    if (XPos > 0 && XPos < width && YPos > 0 && YPos < height){
+    if (XPos > 0 && XPos < width && YPos > 0 && YPos < height) {
+      int[] Seed = {x1, y1, x2, y2};
+      int[] Separated = GetColourFromSeed(Seed);
+      int ColourChosen = ToHex(Separated[0], Separated[1], Separated[2]);
       pixels[PixelIndex] = 0xFFFFFFFF;
     }
   }
 }
 void DrawFaces(float[][] V) {
+  TriTally = 0;
+
   float LightDirectionX = -0.5;
   float LightDirectionY = 1;
   float LightDirectionZ = -1.5;
@@ -460,6 +479,13 @@ void DrawFaces(float[][] V) {
 
     int ScreenCX = (int)ScreenC[0];
     int ScreenCY = (int)ScreenC[1];
+    if (RenderType == 0) {
+      // only draw wireframe
+      DrawLine(ScreenAX, ScreenAY, ScreenBX, ScreenBY);
+      DrawLine(ScreenBX, ScreenBY, ScreenCX, ScreenCY);
+      DrawLine(ScreenCX, ScreenCY, ScreenAX, ScreenAY);
+      continue;
+    }
 
     if ((ScreenAX < 0 && ScreenBX < 0 && ScreenCX < 0) || (ScreenAX >= width && ScreenBX >= width && ScreenCX >= width) || (ScreenAY < 0 && ScreenBY < 0 && ScreenCY < 0) || (ScreenAY >= height && ScreenBY >= height && ScreenCY >= height)) {
       //if off screen
@@ -516,7 +542,7 @@ void DrawFaces(float[][] V) {
     if (Brightness < 0) {
       Brightness = 0;
     }
-
+    TriTally++;
     Brightness = 0.2 + Brightness * 0.8;
 
     float InverseA = 1.0 / DepthA;
