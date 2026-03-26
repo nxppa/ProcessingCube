@@ -401,14 +401,10 @@ int[][] BresLine(int StartX, int StartY, int EndX, int EndY) {
   return Result;
 }
 int[] GetColourFromSeed(int[] Seed) {
-    if (Seed == null || Seed.length != 4) {
-        throw new IllegalArgumentException("Seed must contain exactly 4 integers.");
-    }
     int[] Result = new int[3];
     Result[0] = Math.abs(Seed[0] * 31 + Seed[1] * 17) % 256;
     Result[1] = Math.abs(Seed[1] * 29 + Seed[2] * 19) % 256;
     Result[2] = Math.abs(Seed[2] * 23 + Seed[3] * 13) % 256;
-
     return Result;
 }
 void DrawLine(int x1, int y1, int x2, int y2) {
