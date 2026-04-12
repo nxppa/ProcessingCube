@@ -22,7 +22,7 @@ int AnimPieceEnd;
 float[] AnimXs;
 float[] AnimZs;
 int AnimFrame = 0;
-int AnimTotalFrames = 20;
+int AnimTotalFrames = 40;
 int AnimRenderIndex;
 int AnimVertStart;
 int AnimVertEnd;
@@ -1027,19 +1027,22 @@ float GetMaxOf(float[] Values) {
   }
   return MaxValue;
 }
-float[] Tween(float start, float end, int frames) {
-  float[] result = new float[frames];
-  if (frames == 1) {
-    result[0] = end;
-    return result;
-  }
-  for (int i = 0; i < frames; i++) { 
-    float t = (float)i / (float)(frames - 1);
-    result[i] = start + (end - start) * t;
-  }
-  return result;
-}
+float[] Tween(float Start, float End, int NumFrames) {
+  float[] Arr = new float[NumFrames];
 
+  float Strength = 4.0; // THIS actually matters now
+
+  for (int x = 0; x < NumFrames; x++) { 
+    float t = (float) x / (float) (NumFrames - 1);
+
+    // real control curve
+    float eased = 1.0 - pow(1.0 - t, Strength);
+
+    Arr[x] = Start + (End - Start) * eased;
+  }
+
+  return Arr;
+}
 int[][] BresLine(int StartX, int StartY, int EndX, int EndY) {
   int DeltaX = Math.abs(EndX - StartX);
   int DeltaY = Math.abs(EndY - StartY);
