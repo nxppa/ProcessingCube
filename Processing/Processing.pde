@@ -1286,10 +1286,6 @@ void DrawFaces(float[][] V) {
       TriTally++;
       Brightness = 0.2 + Brightness * Intensity;
 
-      float InverseA = 1.0 / DepthA;
-      float InverseB = 1.0 / DepthB;
-      float InverseC = 1.0 / DepthC;
-
       int[] BaseColor = GetFaceColourChess(FaceIndex);
 
       int SquareIndex = FaceIndex / 2;
