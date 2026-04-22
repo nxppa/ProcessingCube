@@ -868,20 +868,26 @@ int ToHex(int r, int g, int b) {
   int alpha = 255;
   return alpha * 16777216 + r * 65536 +g * 256 + b;
 }
-
+int[] GetRandomColour(int FaceIndex){
+  int[] Col = new int[3];
+  for(int x = 0; x < 3; x++){
+    int Rand = (int)(Math.random() * 256);
+    Col[x] = Rand;
+  }
+  return Col;
+  
+}
 int[] GetFaceColourChess(int FaceIndex) {
   if (FaceIndex < 138) {
     int BoardSquares = 8;
     int SquareIndex = FaceIndex / 2;
     int x = SquareIndex % BoardSquares;
     int y = SquareIndex / BoardSquares;
-
     int[] Col = ((x + y) % 2 == 0) ? new int[]{235, 236, 208} : new int[]{22, 99, 36};
 
     return Col;
   } else {
     int[] Col = {};
-
     if (FaceIndex < 5575) {
       Col = new int[]{54, 32, 16};
     } else {
@@ -1029,18 +1035,12 @@ float GetMaxOf(float[] Values) {
 }
 float[] Tween(float Start, float End, int NumFrames) {
   float[] Arr = new float[NumFrames];
-
-  float Strength = 4.0; // THIS actually matters now
-
+  float Strength = 4.0;
   for (int x = 0; x < NumFrames; x++) { 
     float t = (float) x / (float) (NumFrames - 1);
-
-    // real control curve
     float eased = 1.0 - pow(1.0 - t, Strength);
-
     Arr[x] = Start + (End - Start) * eased;
   }
-
   return Arr;
 }
 int[][] BresLine(int StartX, int StartY, int EndX, int EndY) {
@@ -1256,10 +1256,9 @@ void DrawFaces(float[][] V) {
       }
       
       float InverseDenom = 1.0 / denom;
-
-      float[] ModelVertexA = VertexA;
-      float[] ModelVertexB = VertexB;
-      float[] ModelVertexC = VertexC;
+float[] ModelVertexA = Verticies[VertexIndexA];
+float[] ModelVertexB = Verticies[VertexIndexB];
+float[] ModelVertexC = Verticies[VertexIndexC];
 
       float EdgeAX = ModelVertexB[0] - ModelVertexA[0];
       float EdgeAY = ModelVertexB[1] - ModelVertexA[1];
